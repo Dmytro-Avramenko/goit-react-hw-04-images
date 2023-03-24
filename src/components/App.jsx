@@ -1,99 +1,98 @@
 import React, { useState, useEffect } from 'react';
-import ImageGallery from "./ImageGallery/ImageGallery";
-import Modal from "./Modal/Modal";
-import Searchbar from "./Searchbar/Searchbar";
+import 'react-toastify/dist/ReactToastify.css';
 
-export default function App() {
-  const [inputName, setInputName] = useState('');
-  const [modalImg, setModalImg] = useState('');
+import { Button } from './Button/Button';
+import { ImageGallery } from './ImageGallery/ImageGallery';
+import { ImageGalleryItem } from './ImageGalleryItem/ImageGalleryItem';
+import { Modal } from './Modal/Modal';
+import { Searchbar } from './Searchbar/Searchbar';
+import * as message from './notification';
+import { getImages } from './Api';
+import { Loader } from './Loader/Loader';
+
+export function App() {
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [showModal, setShowModal] = useState(false);
+  const [images, setImages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [totalImages, setTotalImages] = useState(0);
+  const [selectImage, setSelectImage] = useState(null);
 
-
-  const getInputValue = handleValue => {
-    setInputName(handleValue);
-    setPage(1);
-  };
-
-  const toggleModal = () => {
-    setShowModal(showModal => !showModal )
-  }
-
-  const getLargeImg = (url) => {
-    toggleModal();
-    setModalImg(url);
-  }
-
-  const loadMoreBtn = () => {
-    setPage(prevPage => prevPage + 1);
-  };
+  const maxPage = Math.ceil(totalImages / 12);
+  const showButton = images.length > 0 && page < maxPage;
 
   useEffect(() => {
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: 'smooth',
-    });
-  }, [page]);
-  
+    if (search === '') {
+      return;
+    }
+
+    async function newSearchRequestServer() {
+      try {
+        const response = await getImages({ search, page });
+        const totalImages = response.data.totalHits;
+        const images = response.data.hits;
+
+        if (totalImages === 0 || images === '') {
+          return message.notificationError();
+        }
+        if (page === 1) {
+          message.notificationSuccess(totalImages);
+        }
+        setImages(prevState => [...prevState, ...images]);
+        setTotalImages(totalImages);
+      } catch (error) {        
+        message.notificationServerError();
+      } finally {
+        setLoading(false);
+      }
+    }
+    setLoading(true);
+    newSearchRequestServer();
+    return () => {      
+    };
+  }, [search, page]);
+
+  function trackingSearchQuery(evt) {
+    evt.preventDefault();
+
+    const form = evt.currentTarget;
+    const searchValue = form.elements.search.value;
+
+    if (searchValue.trim() === '') {
+      return message.notificationInfo();
+    }
+    setPage(1);
+    setImages([]);
+    setSearch(searchValue);
+    form.reset();
+  }
+
+  function loadMoreImages() {
+    setPage(prevState => prevState + 1);    
+  }
+
+  function openModal(evt) {
+    const imageInfo = { alt: evt.target.alt, url: evt.currentTarget.dataset.large };
+    setSelectImage(imageInfo);
+  }
+
+  function closeModal() {
+    setSelectImage(null);
+  }  
+
   return (
     <>
-      <Searchbar getInputValue={getInputValue}/>
-      <ImageGallery
-        inputName={inputName}
-        onClick={getLargeImg}
-        loadMoreBtn={loadMoreBtn}
-        page={page} />
-      {showModal && <Modal url={modalImg} onClose={toggleModal} />}
+      <Searchbar onSubmit={trackingSearchQuery} />
+      <ImageGallery>
+        {images.map(image => (
+          <ImageGalleryItem key={image.id} image={image} onClick={openModal} />
+        ))}
+      </ImageGallery>
+      {loading && <Loader />}
+      {showButton && <Button onClick={loadMoreImages} />}
+      {selectImage && <Modal onClose={closeModal} image={selectImage} />}
     </>
-  )  
+  );
 }
 
-
-
-// код на класах
-// import React, { Component } from 'react';
-// import ImageGallery from "./ImageGallery/ImageGallery";
-// import Modal from "./Modal/Modal";
-// import Searchbar from "./Searchbar/Searchbar";
-
-// export default class App extends Component {
-
-//   state = {
-//     inputName: '',
-//     modalImg: '',
-//     page: 1,
-//     showModal: false,
-//   }
-
-//   getInputValue = handleValue => {
-//     this.setState({ inputName: handleValue, page: 1 })
-//   }
-
-//   toggleModal = () => {
-//     this.setState(({ showModal }) => ({ showModal: !showModal }))
-//   }
-
-//   getLargeImg = url => {
-//     this.toggleModal();
-//     this.setState({ modalImg: url });
-//   }
-
-//   loadMoreBtn = () => {
-//     this.setState(prevState => ({
-//       page: prevState.page + 1,
-//     }));
-//   };
-
-//   render() {
-//     return (
-//       <>
-//         <Searchbar getInputValue={this.getInputValue}/>
-//         <ImageGallery inputName={this.state.inputName}
-//           onClick={this.getLargeImg}
-//           loadMoreBtn={this.loadMoreBtn}
-//           page={this.state.page} />
-//         {this.state.showModal && <Modal url={this.state.modalImg} onClose={this.toggleModal} />}
-//       </>
-//     )
-//   }
-// }
+export default App
