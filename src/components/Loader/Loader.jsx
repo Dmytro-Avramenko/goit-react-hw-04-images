@@ -1,7 +1,7 @@
 import { Blocks } from 'react-loader-spinner';
 import s from './Loader.module.css';
 
-function Loader() {
+export function Loader() {
   return (
     <div className={s.loader}>
       <Blocks
